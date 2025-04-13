@@ -10,8 +10,12 @@ class Terminal_set:
         self.Hu = Hu
         self.K = K
         self.Ak = Ak
-        self.H = np.block([[Hu, np.zeros((Hu.shape[0], Hx.shape[1]))],
-                          [np.zeros((Hx.shape[0], Hu.shape[1])), Hx]])
+        self.H = np.block(
+            [
+                [Hu, np.zeros((Hu.shape[0], Hx.shape[1]))],
+                [np.zeros((Hx.shape[0], Hu.shape[1])), Hx],
+            ]
+        )
         self.Nc = self.H.shape[0]
         self.Nx = Ak.shape[1]
         self.h = h
@@ -25,14 +29,14 @@ class Terminal_set:
         Ainf = np.zeros([0, self.Nx])
         binf = np.zeros([0, 1])
         Ft = np.eye(self.Nx)
-        self.C = self.H@self.K_aug
+        self.C = self.H @ self.K_aug
 
         for t in range(self.maxiter):
-            Ainf = np.vstack((Ainf, self.C@Ft))
+            Ainf = np.vstack((Ainf, self.C @ Ft))
             binf = np.vstack((binf, self.h))
 
-            Ft = self.Ak@Ft
-            fobj = self.C@Ft
+            Ft = self.Ak @ Ft
+            fobj = self.C @ Ft
             violation = False
             for i in range(self.Nc):
                 val, x = self.solve_linprog(fobj[i, :], Ainf, binf)
@@ -44,8 +48,8 @@ class Terminal_set:
 
     def solve_linprog(self, obj, Ainf, binf):
         x = cp.Variable((self.Nx, 1))
-        objective = cp.Maximize(obj@x)
-        constraints = [Ainf@x <= binf]
+        objective = cp.Maximize(obj @ x)
+        constraints = [Ainf @ x <= binf]
         linear_program = cp.Problem(objective, constraints)
 
         result = linear_program.solve(verbose=False)
@@ -122,23 +126,22 @@ class Terminal_set:
     #     plt.title('vz')
     #     plt.show()
     #     input()
-        
-    def test_input_inbound(self,u_limit):
-        A_inf,b_inf=self.Xf_nr
-        violation =False
+
+    def test_input_inbound(self, u_limit):
+        A_inf, b_inf = self.Xf_nr
+        violation = False
         for i in range(4):
             x = cp.Variable((12, 1))
             u = cp.Variable((4, 1))
-            cost=0
+            cost = 0
             constr = []
-            constr.append(A_inf@x[:,0] <= b_inf.squeeze())
-            constr.append(u[:, 0]==-self.K@x[:,0])
-            cost=u[i, 0]
+            constr.append(A_inf @ x[:, 0] <= b_inf.squeeze())
+            constr.append(u[:, 0] == -self.K @ x[:, 0])
+            cost = u[i, 0]
             problem = cp.Problem(cp.Maximize(cost), constr)
             problem.solve()
-            print('Input u',i,'<',problem.value)
-            if problem.value >u_limit:
-                violation =True
-        if violation ==False:
-            print('Input inbound')
-
+            print("Input u", i, "<", problem.value)
+            if problem.value > u_limit:
+                violation = True
+        if violation == False:
+            print("Input inbound")

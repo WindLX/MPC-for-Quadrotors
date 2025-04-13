@@ -9,6 +9,7 @@ import numpy.linalg as LA
 import control
 import math
 import matplotlib.pyplot as plt
+
 # from nonlinear_mpc_solver import *
 import scipy.io
 
@@ -27,7 +28,8 @@ class Controller:
         self.k_drag = self.quad_model.k_drag
         self.to_TM = self.quad_model.to_TM
         self.inertia = np.diag(
-            [self.quad_model.Ixx, self.quad_model.Iyy, self.quad_model.Izz])
+            [self.quad_model.Ixx, self.quad_model.Iyy, self.quad_model.Izz]
+        )
 
     def generate_control_input(self, u):
         cmd_motor_speeds = np.zeros((4,))
@@ -50,23 +52,25 @@ class Controller:
         cmd_moment[1] = u[2]  # moment about q
         cmd_moment[2] = u[3]  # moment about r
 
-        control_input = {'cmd_motor_speeds': cmd_motor_speeds,
-                         'cmd_thrust': cmd_thrust,
-                         'cmd_moment': cmd_moment}
+        control_input = {
+            "cmd_motor_speeds": cmd_motor_speeds,
+            "cmd_thrust": cmd_thrust,
+            "cmd_moment": cmd_moment,
+        }
         return control_input
-    
+
     def state2x(self, state):
-        x = state.get('x').flatten()
-        v = state.get('v').flatten()
+        x = state.get("x").flatten()
+        v = state.get("v").flatten()
         try:
-            q = state.get('q').flatten()
-            w = state.get('w').flatten()
+            q = state.get("q").flatten()
+            w = state.get("w").flatten()
             euler_ang = self.euler_from_quaternion(q[0], q[1], q[2], q[3])
         except:
             euler_ang = np.zeros(3)
-            euler_ang[2] = state.get('yaw')
+            euler_ang[2] = state.get("yaw")
             w = np.zeros(3)
-            w[2] = state.get('yaw_dot')
+            w[2] = state.get("yaw_dot")
 
         x_init = np.block([x, v, euler_ang, w])
         return x_init
@@ -105,33 +109,33 @@ class PDcontroller(Controller):
         self.Kd_t = np.diag([30, 30, 7.55])
 
     def control(self, cur_time, obs_state):
-        '''
+        """
         :param desired state: pos, vel, acc, yaw, yaw_dot
         :param current state: pos, vel, euler, omega
         :return:
-        '''
+        """
         des_state = self.traj.get_des_state(cur_time)
         # position controller
-        error_pos = des_state.get('x') - obs_state.get('x').reshape(3, 1)
-        error_vel = des_state.get('v') - obs_state.get('v').reshape(3, 1)
-        rdd_des = des_state.get('x_ddt')
+        error_pos = des_state.get("x") - obs_state.get("x").reshape(3, 1)
+        error_vel = des_state.get("v") - obs_state.get("v").reshape(3, 1)
+        rdd_des = des_state.get("x_ddt")
         rdd_cmd = rdd_des + self.Kd @ error_vel + self.Kp @ error_pos
         u1 = self.mass * (self.g + rdd_cmd[2]).reshape(-1, 1)
 
         # attitude controller
-        psi_des = des_state.get('yaw')
-        phi_cmd = (rdd_cmd[0] * np.sin(psi_des) -
-                   rdd_cmd[1] * np.cos(psi_des)) / self.g
-        theta_cmd = (rdd_cmd[0] * np.cos(psi_des) +
-                     rdd_cmd[1] * np.sin(psi_des)) / self.g
-        quat = obs_state['q']
+        psi_des = des_state.get("yaw")
+        phi_cmd = (rdd_cmd[0] * np.sin(psi_des) - rdd_cmd[1] * np.cos(psi_des)) / self.g
+        theta_cmd = (
+            rdd_cmd[0] * np.cos(psi_des) + rdd_cmd[1] * np.sin(psi_des)
+        ) / self.g
+        quat = obs_state["q"]
         rotation = Rotation.from_quat(quat)
         angle = np.array(rotation.as_rotvec()).reshape(3, 1)  # euler angles
-        omega = np.array(obs_state['w']).reshape(3, 1)  # anglar velocity
-        psid_des = des_state.get('yaw_dot')
-        ang_ddt = self.Kd_t @ (np.array([[0], [0], [psid_des]]) - omega) + \
-            self.Kp_t @ (np.array([[phi_cmd[0]],
-                         [theta_cmd[0]], [psi_des]]) - angle)
+        omega = np.array(obs_state["w"]).reshape(3, 1)  # anglar velocity
+        psid_des = des_state.get("yaw_dot")
+        ang_ddt = self.Kd_t @ (np.array([[0], [0], [psid_des]]) - omega) + self.Kp_t @ (
+            np.array([[phi_cmd[0]], [theta_cmd[0]], [psi_des]]) - angle
+        )
         u2 = self.inertia @ ang_ddt
 
         u = np.vstack((u1, u2))
@@ -144,13 +148,14 @@ class NonLinear_MPC(Controller):
     def __init__(self, traj, ctrl_freq):
         super().__init__(traj, ctrl_freq)
         self.param = MPC_Formulation_Param()
-        self.param.set_horizon(dt=1/self.ctrl_freq, N=5)
+        self.param.set_horizon(dt=1 / self.ctrl_freq, N=5)
         self.solver = acados_mpc_solver_generation(
-            self.param, collision_avoidance=False)
+            self.param, collision_avoidance=False
+        )
 
     def control(self, cur_time, obs_state):
         des_state = self.traj.get_des_state(cur_time)
-        error_pos = (des_state.get('x') - obs_state.get('x').reshape(3, 1)).flatten()
+        error_pos = (des_state.get("x") - obs_state.get("x").reshape(3, 1)).flatten()
 
         x_init = self.state2x(obs_state)
         self.solver.set(0, "lbx", x_init)
@@ -166,12 +171,15 @@ class NonLinear_MPC(Controller):
             self.solver.set(k, "yref", yref)
 
         yref_e = yref[:6]
-        self.solver.set(self.param.N, 'yref', yref_e)
+        self.solver.set(self.param.N, "yref", yref_e)
 
         status = self.solver.solve()
         if status != 0:
-            print("acados returned status {} in closed loop iteration {}.".format(
-                status, cur_time))
+            print(
+                "acados returned status {} in closed loop iteration {}.".format(
+                    status, cur_time
+                )
+            )
 
         u = self.solver.get(0, "u")
         u[0] *= self.mass
@@ -186,93 +194,122 @@ class Linear_MPC(Controller):
         self.ctrl_freq = ctrl_freq
         self.dt = 1 / self.ctrl_freq
         self.Ad, self.Bd = self.quad_model.get_dLTI(self.dt)
-        self.gravity = np.zeros([12, ])
-        self.gravity[5] = self.dt*self.g  # discritized
+        self.gravity = np.zeros(
+            [
+                12,
+            ]
+        )
+        self.gravity[5] = self.dt * self.g  # discritized
         self.use_obsv = use_obsv
-        self.B_dist = np.block([[np.zeros((3, 3))],
-                                [np.eye(3)],
-                                [np.zeros((3, 3))],
-                                [np.zeros((3, 3))]])
-        self.disturbance_observer = Luenberger_Observer(self.Ad, self.Bd, self.B_dist, C=np.eye(12), C_dist=np.zeros((12, 3)), gravity=self.gravity, load_L=False)
+        self.B_dist = np.block(
+            [[np.zeros((3, 3))], [np.eye(3)], [np.zeros((3, 3))], [np.zeros((3, 3))]]
+        )
+        self.disturbance_observer = Luenberger_Observer(
+            self.Ad,
+            self.Bd,
+            self.B_dist,
+            C=np.eye(12),
+            C_dist=np.zeros((12, 3)),
+            gravity=self.gravity,
+            load_L=False,
+        )
         C_obs = np.zeros((6, 12))
         C_obs[:3, :3] = np.eye(3)
         C_obs[3:, 6:9] = np.eye(3)
-        self.vel_observer = Luenberger_Observer(self.Ad, self.Bd, self.B_dist, C=C_obs, C_dist=np.zeros((6, 3)),gravity=self.gravity, load_L=True)
+        self.vel_observer = Luenberger_Observer(
+            self.Ad,
+            self.Bd,
+            self.B_dist,
+            C=C_obs,
+            C_dist=np.zeros((6, 3)),
+            gravity=self.gravity,
+            load_L=True,
+        )
         self.x_real = [[], [], []]
         self.x_obsv = [[], [], []]
         self.d_hat_list = []
-        
+
         self.N = 5  # the number of predicted steps TODO
         self.Q = np.diag([80, 80, 100, 80, 80, 100, 50, 50, 50, 50, 50, 50])
         self.R = np.diag([50, 80, 80, 80])
         self.P, self.K = self.get_terminal_cost(self.Ad, self.Bd, self.Q, self.R)
 
-        self.Ak = self.Ad - self.Bd@self.K
-        self.Hx = np.array([
-                            [0, 0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0],  # roll pitch constraints
-                            [0, 0, 0, 0, 0, 0, -1.0, 0, 0, 0, 0, 0],
-                            [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0], #velocity constraints
-                            [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-                            [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-                            [0, 0, 0, 0, 0, 0, 0, -1.0, 0, 0, 0, 0],
-                            [0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 0],
-                            [0, 0, 0, -1.0, 0, 0, 0, 0, 0, 0, 0, 0],
-                            [0, 0, 0, 0, -1.0, 0, 0, 0, 0, 0, 0, 0],
-                            [0, 0, 0, 0, 0, -1.0, 0, 0, 0, 0, 0, 0],
-                            [0, 0, 0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0],
-                            [0, 0, 0, 0, 0, 0, 0, 0, -1.0, 0, 0, 0],
-                            ])
-        self.Hu = np.array([[1/self.mass, 0, 0, 0],
-                            [-1/self.mass, 0, 0, 0]
-                            ])  # z acc constraints
-        self.Hu1 = np.array([[1/self.mass, 0, 0, 0],
-                            [-1/self.mass, 0, 0, 0],
-                            [0, 1.0, 0, 0],
-                            [0, -1.0, 0, 0],
-                            [0, 0, 1.0, 0],
-                            [0, 0, -1.0, 0],
-                            [0, 0, 0, 1.0],
-                            [0, 0, 0, -1.0]
-                            ])
-        self.h = np.array([[0.5*self.g],  # z acc constraints
-                           [0.5*self.g],
-                           [0.5],  
-                           [0.5],
-                           [2.0],#velocity constraints
-                           [2.0],
-                           [2.0],
-                           [0.5], 
-                           [0.5],
-                           [2.0],
-                           [2.0],
-                           [2.0],
-                           [0.5],  
-                           [0.5]
-                           ])
-        self.h1 = np.array([[1.5*self.g],  # z acc constraints
-                           [-0.5*self.g],
-                           [0.15],  
-                           [0.15],
-                           [0.15],
-                           [0.15],  
-                           [0.15],  
-                           [0.15],
-                           [0.5],  
-                           [0.5],
-                           [2.0],#velocity constraints
-                           [2.0],
-                           [2.0],
-                           [0.5], 
-                           [0.5],
-                           [2.0],
-                           [2.0],
-                           [2.0],
-                           [0.5],  
-                           [0.5]
-                           ])
-        self.terminal_set = Terminal_set(
-            self.Hx, self.Hu, self.K, self.Ak, self.h)
-        
+        self.Ak = self.Ad - self.Bd @ self.K
+        self.Hx = np.array(
+            [
+                [0, 0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0],  # roll pitch constraints
+                [0, 0, 0, 0, 0, 0, -1.0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],  # velocity constraints
+                [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, -1.0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 0],
+                [0, 0, 0, -1.0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, -1.0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, -1.0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, -1.0, 0, 0, 0],
+            ]
+        )
+        self.Hu = np.array(
+            [[1 / self.mass, 0, 0, 0], [-1 / self.mass, 0, 0, 0]]
+        )  # z acc constraints
+        self.Hu1 = np.array(
+            [
+                [1 / self.mass, 0, 0, 0],
+                [-1 / self.mass, 0, 0, 0],
+                [0, 1.0, 0, 0],
+                [0, -1.0, 0, 0],
+                [0, 0, 1.0, 0],
+                [0, 0, -1.0, 0],
+                [0, 0, 0, 1.0],
+                [0, 0, 0, -1.0],
+            ]
+        )
+        self.h = np.array(
+            [
+                [0.5 * self.g],  # z acc constraints
+                [0.5 * self.g],
+                [0.5],
+                [0.5],
+                [2.0],  # velocity constraints
+                [2.0],
+                [2.0],
+                [0.5],
+                [0.5],
+                [2.0],
+                [2.0],
+                [2.0],
+                [0.5],
+                [0.5],
+            ]
+        )
+        self.h1 = np.array(
+            [
+                [1.5 * self.g],  # z acc constraints
+                [-0.5 * self.g],
+                [0.15],
+                [0.15],
+                [0.15],
+                [0.15],
+                [0.15],
+                [0.15],
+                [0.5],
+                [0.5],
+                [2.0],  # velocity constraints
+                [2.0],
+                [2.0],
+                [0.5],
+                [0.5],
+                [2.0],
+                [2.0],
+                [2.0],
+                [0.5],
+                [0.5],
+            ]
+        )
+        self.terminal_set = Terminal_set(self.Hx, self.Hu, self.K, self.Ak, self.h)
+
         self.Xf_nr = self.terminal_set.Xf_nr
 
         self.terminal_set.test_input_inbound(u_limit=0.15)
@@ -280,10 +317,9 @@ class Linear_MPC(Controller):
         self.x_real = [[], [], []]
         self.x_obsv = [[], [], []]
 
-
     def control(self, cur_time, obs_state):
         des_state = self.traj.get_des_state(cur_time)
-        error_pos = (des_state.get('x') - obs_state.get('x').reshape(3, 1)).flatten()
+        error_pos = (des_state.get("x") - obs_state.get("x").reshape(3, 1)).flatten()
 
         x_sys = self.state2x(obs_state)
         x_obs_dist = self.disturbance_observer.x_hat.flatten()
@@ -299,38 +335,48 @@ class Linear_MPC(Controller):
         d_hat = self.disturbance_observer.d_hat
         self.d_hat_list.append(d_hat[1])
         for i in range(3, 6):
-            self.x_real[i-3].append(x_sys[i])
-            self.x_obsv[i-3].append(x_obs_vel[i])
-        
-        x = cp.Variable((12, self.N+1))
+            self.x_real[i - 3].append(x_sys[i])
+            self.x_obsv[i - 3].append(x_obs_vel[i])
+
+        x = cp.Variable((12, self.N + 1))
         u = cp.Variable((4, self.N))
         cost = 0
         constr = []
         mpc_time = cur_time
         desired_x = []
-        for k in range(self.N+1):
+        for k in range(self.N + 1):
             mpc_time += k * self.dt
             des_state_ahead = self.traj.get_des_state(mpc_time)
             x_ref_k = self.state2x(des_state_ahead)
             desired_x.append(x_ref_k)
             if k == self.N:
-                cost += cp.quad_form(x[:, self.N]-x_ref_k, self.P)
+                cost += cp.quad_form(x[:, self.N] - x_ref_k, self.P)
                 if self.use_obsv == False:
                     constr.append(
-                        self.Xf_nr[0] @ (x[:, self.N]-x_ref_k) <= self.Xf_nr[1].squeeze())
+                        self.Xf_nr[0] @ (x[:, self.N] - x_ref_k)
+                        <= self.Xf_nr[1].squeeze()
+                    )
                 break
             cost += cp.quad_form(x[:, k] - x_ref_k, self.Q)
-            u_ref_k = np.array([self.mass*self.g, 0, 0, 0])
+            u_ref_k = np.array([self.mass * self.g, 0, 0, 0])
             cost += cp.quad_form(u[:, k] - u_ref_k, self.R)
 
-            constr.append(self.Hx @ x[:, k] <= self.h1[self.Hu1.shape[0]:].squeeze())
-            constr.append(self.Hu1 @ u[:, k] <= self.h1[:self.Hu1.shape[0]].squeeze())
-            gravity = np.zeros([12, ])
-            gravity[5] = self.dt*self.g  # discritized
+            constr.append(self.Hx @ x[:, k] <= self.h1[self.Hu1.shape[0] :].squeeze())
+            constr.append(self.Hu1 @ u[:, k] <= self.h1[: self.Hu1.shape[0]].squeeze())
+            gravity = np.zeros(
+                [
+                    12,
+                ]
+            )
+            gravity[5] = self.dt * self.g  # discritized
 
-
-            constr.append(x[:, k + 1] == self.Ad @ x[:, k] +
-                          self.Bd @ u[:, k] - self.gravity + (self.B_dist@d_hat).flatten())
+            constr.append(
+                x[:, k + 1]
+                == self.Ad @ x[:, k]
+                + self.Bd @ u[:, k]
+                - self.gravity
+                + (self.B_dist @ d_hat).flatten()
+            )
 
         constr.append(x[:, 0] == x_init)
         problem = cp.Problem(cp.Minimize(cost), constr)
@@ -341,7 +387,7 @@ class Linear_MPC(Controller):
         if self.use_obsv:
             self.disturbance_observer.update(u, x_sys)
             self.vel_observer.update(u, y)
-        
+
         control_input = self.generate_control_input(u)
         return control_input, error_pos
 
@@ -352,30 +398,28 @@ class Linear_MPC(Controller):
 
 class Luenberger_Observer:
     def __init__(self, A, B, B_dist, C, C_dist, gravity, load_L=False):
-        self.x_hat = np.zeros((12, 1))+0.1
+        self.x_hat = np.zeros((12, 1)) + 0.1
         self.d_hat = np.zeros((3, 1))
-        self.A_sq = np.block([[A, B_dist],
-                              [np.zeros((3, 12)), np.eye(3)]])
-        self.B_sq = np.block([[B],
-                              [np.zeros((3, 4))]])
+        self.A_sq = np.block([[A, B_dist], [np.zeros((3, 12)), np.eye(3)]])
+        self.B_sq = np.block([[B], [np.zeros((3, 4))]])
         self.C_sq = np.block([C, C_dist])
-        self.gravity = np.block([[gravity.reshape(-1, 1)],
-                               [np.zeros((3, 1))]])
-        
+        self.gravity = np.block([[gravity.reshape(-1, 1)], [np.zeros((3, 1))]])
+
         if load_L:
-            file_path = 'saveL.mat'
+            file_path = "saveL.mat"
             mat = scipy.io.loadmat(file_path)
-            self.L = mat['L']
+            self.L = mat["L"]
         else:
             eig = [0.5 for i in range(7)] + [0.7 for i in range(8)]
             self.L = control.place(self.A_sq.T, self.C_sq.T, eig).T
 
     def update(self, u, y):
-        exd_state = np.block([[self.x_hat],
-                              [self.d_hat]])
-        exd_state = self.A_sq@exd_state + \
-            self.B_sq@u.reshape(-1, 1) + \
-            self.L@(y.reshape(-1, 1) - self.C_sq@exd_state) - self.gravity
+        exd_state = np.block([[self.x_hat], [self.d_hat]])
+        exd_state = (
+            self.A_sq @ exd_state
+            + self.B_sq @ u.reshape(-1, 1)
+            + self.L @ (y.reshape(-1, 1) - self.C_sq @ exd_state)
+            - self.gravity
+        )
         self.x_hat = exd_state[:12]
         self.d_hat = exd_state[12:]
-
