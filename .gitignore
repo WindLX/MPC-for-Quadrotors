@@ -127,3 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Solver
+c_generated_code
+ACADOS_*.json
