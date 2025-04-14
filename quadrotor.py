@@ -1,5 +1,5 @@
 import numpy as np
-from numpy.linalg import inv, norm
+from numpy.linalg import inv
 import scipy.integrate
 from scipy.spatial.transform import Rotation
 import control
@@ -39,8 +39,8 @@ class Quadrotor:
         self.arm_length = 0.046  # meters
         self.rotor_speed_min = 0  # rad/s
         self.rotor_speed_max = 2500  # rad/s
-        self.k_thrust = 2.3e-08  # N/(rad/s)**2
-        self.k_drag = 7.8e-11  # Nm/(rad/s)**2
+        self.k_thrust = 2.3e-08  # N/(rad/s)**2 推力系数
+        self.k_drag = 7.8e-11  # Nm/(rad/s)**2 扭矩系数
 
         # Additional constants.
         self.inertia = np.diag(np.array([self.Ixx, self.Iyy, self.Izz]))  # kg*m^2
@@ -50,7 +50,12 @@ class Quadrotor:
         k = self.k_drag / self.k_thrust
         L = self.arm_length
         self.to_TM = np.array(
-            [[1, 1, 1, 1], [0, L, 0, -L], [-L, 0, L, 0], [k, -k, k, -k]]
+            [
+                [1, 1, 1, 1],  # 总推力
+                [0, L, 0, -L],  # 绕x轴力矩（横滚）
+                [-L, 0, L, 0],  # 绕y轴力矩（俯仰）
+                [k, -k, k, -k],  # 绕z轴力矩（偏航）
+            ]
         )
         self.inv_inertia = inv(self.inertia)
         self.weight = np.array([0, 0, -self.mass * self.g])
@@ -132,6 +137,7 @@ class Quadrotor:
         x_dot = state["v"]
 
         # Velocity derivative.
+        # $\dot{v} = \frac{1}{m}(F_{thrust} \cdot R \cdot \mathbf{k} + m\mathbf{g})$
         F = u1 * Quadrotor.rotate_k(state["q"])
         v_dot = (self.weight + F) / self.mass
 
@@ -139,6 +145,7 @@ class Quadrotor:
         q_dot = quat_dot(state["q"], state["w"])
 
         # Angular velocity derivative. page 26 Equation 4
+        # $\dot{\omega} = I^{-1}(M - \omega \times I\omega)$
         omega = state["w"]
         omega_hat = Quadrotor.hat_map(omega)
         w_dot = self.inv_inertia @ (u2 - omega_hat @ (self.inertia @ omega))
@@ -153,6 +160,7 @@ class Quadrotor:
         return s_dot
 
     def get_dLTI(self, dt):
+        # 生成悬停状态附近的线性化模型
         num_x = 12
         Ac = np.array(
             [

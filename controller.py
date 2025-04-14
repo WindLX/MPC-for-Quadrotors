@@ -1,16 +1,12 @@
-from re import I
 from terminal_set import Terminal_set
 import numpy as np
 from scipy.spatial.transform import Rotation
 import quadrotor
 import cvxpy as cp
-import trajectory
-import numpy.linalg as LA
 import control
 import math
-import matplotlib.pyplot as plt
 
-# from nonlinear_mpc_solver import *
+from nonlinear_mpc_solver import *
 import scipy.io
 
 

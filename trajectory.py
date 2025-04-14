@@ -1,3 +1,5 @@
+import argparse
+
 import numpy as np
 import numpy.linalg as LA
 import matplotlib.pyplot as plt
@@ -142,34 +144,56 @@ class Trajectory:
         return des_state
 
 
-# trajectory=Trajectory('diamond')
+if __name__ == "__main__":
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument("--traj", type=str, default="circle", help="trajectory type")
+    args = argparser.parse_args()
+    target = args.traj
+    if target not in ["diamond", "oneline", "hover", "circle"]:
+        print("Invalid trajectory type. Choose from diamond, oneline, hover, circle.")
+        exit(1)
+    print("Trajectory type: ", target)
 
-# t=np.arange(0,17,0.01)
-# x=[]
-# v=[]
-# a=[]
-# for i in t:
-#     des=trajectory.get_des_state(i)
-#     x.append(des['x'])
-#     v.append(des['v'])
-#     a.append(des['x_ddt'])
-# x=np.array(x)
-# v=np.array(v)
-# a=np.array(a)
-# i = 1
-# plt.subplot(3, 1, 1)
-# plt.plot(t, x[:, i])
-# plt.xlabel('t')
-# plt.ylabel('state value')
-# plt.title('x')
-# plt.subplot(3, 1, 2)
-# plt.plot(t, v[:, i])
-# plt.xlabel('t')
-# plt.ylabel('state value')
-# plt.title('v')
-# plt.subplot(3, 1, 3)
-# plt.plot(t, a[:, i])
-# plt.xlabel('t')
-# plt.ylabel('state value')
-# plt.title('acc')
-# plt.show()
+    trajectory = Trajectory(target)
+
+    t = np.arange(0, 17, 0.01)
+    x = []
+    v = []
+    a = []
+    for i in t:
+        des = trajectory.get_des_state(i)
+        x.append(des["x"])
+        v.append(des["v"])
+        a.append(des["x_ddt"])
+    x = np.array(x)
+    v = np.array(v)
+    a = np.array(a)
+    i = 1
+    plt.figure()
+    plt.subplot(3, 1, 1)
+    plt.plot(t, x[:, i])
+    plt.xlabel("t")
+    plt.ylabel("state value")
+    plt.title("x")
+    plt.subplot(3, 1, 2)
+    plt.plot(t, v[:, i])
+    plt.xlabel("t")
+    plt.ylabel("state value")
+    plt.title("v")
+    plt.subplot(3, 1, 3)
+    plt.plot(t, a[:, i])
+    plt.xlabel("t")
+    plt.ylabel("state value")
+    plt.title("acc")
+    plt.show()
+
+    # 3D trajectory plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection="3d")
+    ax.plot(x[:, 0, 0], x[:, 1, 0], x[:, 2, 0], label="3D Trajectory")
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+    ax.set_title("3D Trajectory")
+    ax.legend()
+    plt.show()

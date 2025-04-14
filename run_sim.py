@@ -3,9 +3,6 @@ import quadrotor
 import controller
 import trajectory
 import numpy as np
-import matplotlib.pyplot as plt
-import mpl_toolkits.mplot3d.axes3d as p3
-from matplotlib import animation
 from utils import *
 import time
 import matplotlib
@@ -28,8 +25,8 @@ if __name__ == "__main__":
     ctrl_freq = 50
     traj = trajectory.Trajectory("diamond")
 
-    quad_controller = controller.Linear_MPC(traj, ctrl_freq, use_obsv=False)
-    # quad_controller = controller.NonLinear_MPC(traj, ctrl_freq)
+    # quad_controller = controller.Linear_MPC(traj, ctrl_freq, use_obsv=False)
+    quad_controller = controller.NonLinear_MPC(traj, ctrl_freq)
     # quad_controller = controller.PDcontroller(traj, ctrl_freq)
 
     simu_time = 10  # sec
@@ -67,12 +64,12 @@ if __name__ == "__main__":
     visualizer = Visualizer(
         simu_time, simu_freq, ctrl_freq, real_trajectory, des_trajectory
     )
-    visualizer.plot_tracking_performance()
-    visualizer.record_tracking_data()
+    # visualizer.plot_tracking_performance()
+    visualizer.animation_3d()
+    # visualizer.record_tracking_data()
     try:
         if quad_controller.use_obsv == True:
             visualizer.plot_obsv_x(quad_controller.x_real, quad_controller.x_obsv)
             # visualizer.plot_obsv_d(quad_controller.d_hat_list)
     except:
         pass
-    visualizer.animation_3d()

@@ -1,9 +1,5 @@
-import quadrotor
-import controller
-import trajectory
 import numpy as np
 import matplotlib.pyplot as plt
-import mpl_toolkits.mplot3d.axes3d as p3
 from matplotlib import animation
 import csv
 
@@ -25,9 +21,34 @@ class Visualizer:
         self.des_trajectory["z"] = np.array(self.des_trajectory["z"])
         self.file_data = open("./data.csv", "a")
 
+    def plot_3d(self):
+        fig = plt.figure()
+        ax1 = fig.add_subplot(111, projection="3d")
+        ax1.plot(
+            self.real_trajectory["x"],
+            self.real_trajectory["y"],
+            self.real_trajectory["z"],
+            label="Real_Trajectory",
+        )
+        ax1.plot(
+            self.des_trajectory["x"],
+            self.des_trajectory["y"],
+            self.des_trajectory["z"],
+            label="Des_trajectory",
+        )
+        ax1.set_xlabel("x")
+        ax1.set_ylabel("y")
+        ax1.set_zlabel("z")
+        ax1.set_xlim(-6, 1)
+        ax1.set_ylim(-3, 3)
+        ax1.set_zlim(-0, 2.0)
+        ax1.set_title("3D plot")
+        ax1.legend(loc="lower right")
+        plt.show()
+
     def animation_3d(self):
         fig = plt.figure()
-        ax1 = p3.Axes3D(fig)  # 3D place for drawing
+        ax1 = fig.add_subplot(111, projection="3d")
         (point,) = ax1.plot(
             [self.real_trajectory["x"][0]],
             [self.real_trajectory["y"][0]],
@@ -64,9 +85,9 @@ class Visualizer:
             line2.set_xdata(self.des_trajectory["x"][: i + 10])
             line2.set_ydata(self.des_trajectory["y"][: i + 10])
             line2.set_3d_properties(self.des_trajectory["z"][: i + 10])
-            point.set_xdata(self.real_trajectory["x"][i])
-            point.set_ydata(self.real_trajectory["y"][i])
-            point.set_3d_properties(self.real_trajectory["z"][i])
+            point.set_xdata([self.real_trajectory["x"][i]])
+            point.set_ydata([self.real_trajectory["y"][i]])
+            point.set_3d_properties([self.real_trajectory["z"][i]])
 
         ani = animation.FuncAnimation(
             fig=fig,
